@@ -6,7 +6,8 @@ console.log("Logs from your program will appear here!");
 // Uncomment the code below to pass the first stage
 const server: net.Server = net.createServer((connection: net.Socket) => {
   connection.on("data", (data) => {
-    console.log("Data from client:", data.toString());
+    console.log("Received:", JSON.stringify(data.toString()));
+    connection.write("+PONG\r\n");
   })
   // Handle connection
 });
