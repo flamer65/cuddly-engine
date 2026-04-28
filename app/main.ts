@@ -11,7 +11,7 @@ const writeRESPSimpleString = (data: string):string =>{
 const writeRESPBulkString = (data: string):string =>{
      return `$${data.length}\r\n${data}\r\n`;
 }
-const mem = new Map<String, any>();
+const mem = new Map<String, {value: string, expiresAt: number | null}>();
 // Uncomment the code below to pass the first stage
 const server: net.Server = net.createServer((connection: net.Socket) => {
   connection.on("data", (data: Buffer) => {
@@ -26,11 +26,25 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
         connection.write(writeRESPBulkString(value));
         break;
       case "SET":
-        mem.set(value, args[2]);
+        const options = args[3];
+        const duration = parseInt(args[4]);
+        let expiresAt: number | null = null;
+        if (options?.toUpperCase() === "PX") {
+          expiresAt = Date.now() + duration;
+        }else if(options?.toUpperCase() === "EX"){
+          expiresAt = Date.now() + duration * 1000;
+        }       
+        mem.set(value, {value: args[2], expiresAt});
         connection.write(writeRESPSimpleString("OK"));
         break;
       case "GET":
-        connection.write(writeRESPBulkString(mem.get(value) || ""));
+        const storedValue = mem.get(value);
+        if (!storedValue || (storedValue?.expiresAt && storedValue.expiresAt < Date.now())) {
+          mem.delete(value);
+          connection.write(writeRESPBulkString(""));
+        }else{
+        connection.write(writeRESPBulkString(storedValue.value));
+        }
         break;
       default:
         connection.write("-ERR unknown command\r\n");
