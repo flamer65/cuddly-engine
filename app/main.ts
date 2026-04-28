@@ -41,7 +41,7 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
         const storedValue = mem.get(value);
         if (!storedValue || (storedValue?.expiresAt && storedValue.expiresAt < Date.now())) {
           mem.delete(value);
-          connection.write(writeRESPBulkString(""));
+          connection.write(writeRESPBulkString("$-1\r\n"));
         }else{
         connection.write(writeRESPBulkString(storedValue.value));
         }
