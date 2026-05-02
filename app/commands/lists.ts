@@ -11,7 +11,7 @@ export function handleRpush(args: string[], connection: net.Socket) {
   }
   connection.write(integer(list.length));
 
-  // Notify any BLPOP waiters for this key
+//   Notify any BLPOP waiters for this key
   const waiters = blpopWaiters.get(key);
   while (waiters && waiters.length > 0 && list.length > 0) {
     const resolve = waiters.shift()!;
@@ -99,7 +99,7 @@ export function handleBLPop(args: string[], connection: net.Socket) {
             const idx = waiters.indexOf(resolve as any);
             if (idx !== -1) waiters.splice(idx, 1);
           }
-          connection.write(null);
+          connection.write("*-1\r\n");
         }
       }, timeout * 1000);
     }
