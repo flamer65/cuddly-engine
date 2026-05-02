@@ -23,11 +23,8 @@ export function handleLpush(args: string[], connection: net.Socket){
 }
 export function handleLrange(args: string[], connection: net.Socket){
     const key = args[1];
-    const list = listStore.get(key);
-    if(!list){
-        connection.write(nullBulk());
-        return;
-    } 
+    const list = listStore.get(key) || [];
+   
     let start = parseInt(args[2]);
     let end = parseInt(args[3]);
     if(start < 0) start = Math.max(list.length + start, 0);
