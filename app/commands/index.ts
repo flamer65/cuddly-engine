@@ -1,6 +1,6 @@
 import { writeRESPSimpleString, writeRESPBulkString } from "../resp";
 import { handleSet, handleGet } from "./strings";
-import { handleRpush, handleLpush, handleLrange, handleLlen, handleLpop } from "./lists";
+import { handleRpush, handleLpush, handleLrange, handleLlen, handleLpop, handleBLPop } from "./lists";
 import * as net from "net";
 
 export function dispatch(args: string[], connection: net.Socket) {
@@ -33,6 +33,9 @@ export function dispatch(args: string[], connection: net.Socket) {
       break;
     case "LPOP":
       handleLpop(args, connection);
+      break;
+    case "BLPOP":
+      handleBLPop(args, connection);
       break;
     default:
       connection.write("-ERR unknown command\r\n");

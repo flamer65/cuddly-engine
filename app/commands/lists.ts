@@ -1,4 +1,4 @@
-import { listStore } from "../store";
+import { listStore, blpopWaiters } from "../store";
 import { integer, nullBulk, respArray, writeRESPBulkString } from "../resp";
 import * as net from "net";
 
@@ -10,6 +10,14 @@ export function handleRpush(args: string[], connection: net.Socket) {
     list.push(args[i]);
   }
   connection.write(integer(list.length));
+
+  // Notify any BLPOP waiters for this key
+  const waiters = blpopWaiters.get(key);
+  while (waiters && waiters.length > 0 && list.length > 0) {
+    const resolve = waiters.shift()!;
+    const value = list.shift()!;
+    resolve(value);
+  }
 }
 
 export function handleLpush(args: string[], connection: net.Socket) {
@@ -59,17 +67,47 @@ export function handleLpop(args: string[], connection: net.Socket) {
     }
   }
 }
-export async function handleBLPop(args: string[], connection: net.Socket) {
+export function handleBLPop(args: string[], connection: net.Socket) {
   const key = args[1];
   const timeout = parseInt(args[2]);
-  const list = listStore.get(key) || [];
-  while (list.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, timeout || 0));
-  }
-  const value = list.shift();
-  if (value) {
+
+  // If the list already has data, pop immediately
+  const list = listStore.get(key);
+  if (list && list.length > 0) {
+    const value = list.shift()!;
     connection.write(respArray([key, value]));
-  }else{
-     connection.write(respArray([]));
+    return;
   }
+
+  // Otherwise, register a waiter that will be resolved when RPUSH adds data
+  if (!blpopWaiters.has(key)) blpopWaiters.set(key, []);
+
+  let resolved = false;
+  const waiterPromise = new Promise<string>((resolve) => {
+    blpopWaiters.get(key)!.push((value: string) => {
+      resolved = true;
+      resolve(value);
+    });
+
+    // If timeout > 0, set a timer to give up
+    if (timeout > 0) {
+      setTimeout(() => {
+        if (!resolved) {
+          // Remove this waiter from the queue
+          const waiters = blpopWaiters.get(key);
+          if (waiters) {
+            const idx = waiters.indexOf(resolve as any);
+            if (idx !== -1) waiters.splice(idx, 1);
+          }
+          connection.write(respArray([]));
+        }
+      }, timeout * 1000);
+    }
+  });
+
+  waiterPromise.then((value) => {
+    if (resolved) {
+      connection.write(respArray([key, value]));
+    }
+  });
 }
