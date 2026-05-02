@@ -64,10 +64,12 @@ export async function handleBLPop(args: string[], connection: net.Socket) {
   const timeout = parseInt(args[2]);
   const list = listStore.get(key) || [];
   while (list.length === 0) {
-    await new Promise((resolve) => setTimeout(resolve, timeout));
+    await new Promise((resolve) => setTimeout(resolve, timeout || 0));
   }
   const value = list.shift();
   if (value) {
     connection.write(respArray([key, value]));
+  } else {
+    connection.write(nullBulk());
   }
 }
