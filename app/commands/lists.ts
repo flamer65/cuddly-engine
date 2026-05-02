@@ -69,7 +69,7 @@ export function handleLpop(args: string[], connection: net.Socket) {
 }
 export function handleBLPop(args: string[], connection: net.Socket) {
   const key = args[1];
-  const timeout = parseInt(args[2]);
+  const timeout = parseFloat(args[2]);
 
   // If the list already has data, pop immediately
   const list = listStore.get(key);
