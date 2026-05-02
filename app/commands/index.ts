@@ -1,6 +1,6 @@
 import { writeRESPSimpleString, writeRESPBulkString } from "../resp";
 import { handleSet, handleGet } from "./strings";
-import { handleRpush, handleLpush, handleLrange, handleLlen, handleRpop, handleLpop } from "./lists";
+import { handleRpush, handleLpush, handleLrange, handleLlen, handleLpop } from "./lists";
 import * as net from "net";
 
 export function dispatch(args: string[], connection: net.Socket) {
@@ -30,9 +30,6 @@ export function dispatch(args: string[], connection: net.Socket) {
       break;
     case "LLEN":
       handleLlen(args, connection);
-      break;
-    case "RPOP":
-      handleRpop(args, connection);
       break;
     case "LPOP":
       handleLpop(args, connection);
