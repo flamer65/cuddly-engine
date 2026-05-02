@@ -99,7 +99,7 @@ export function handleBLPop(args: string[], connection: net.Socket) {
             const idx = waiters.indexOf(resolve as any);
             if (idx !== -1) waiters.splice(idx, 1);
           }
-          connection.write(respArray([]));
+          connection.write(null);
         }
       }, timeout * 1000);
     }
