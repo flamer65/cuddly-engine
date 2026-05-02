@@ -59,3 +59,15 @@ export function handleLpop(args: string[], connection: net.Socket) {
     }
   }
 }
+export async function handleBLPop(args: string[], connection: net.Socket) {
+  const key = args[1];
+  const timeout = parseInt(args[2]);
+  const list = listStore.get(key) || [];
+  while (list.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, timeout));
+  }
+  const value = list.shift();
+  if (value) {
+    connection.write(respArray([key, value]));
+  }
+}
