@@ -1,5 +1,5 @@
 import { listStore } from "../store";
-import { integer, nullBulk, respArray } from "../resp";
+import { integer, nullBulk, respArray,writeRESPBulkString } from "../resp";
 import * as net from "net";
 
 export function handleRpush(args: string[], connection: net.Socket){
@@ -38,4 +38,31 @@ export function handleLlen(args: string[], connection: net.Socket){
     const key = args[1];
     const list = listStore.get(key) || [];
     connection.write(integer(list.length));
+}
+
+export function handleRpop(args: string[], connection: net.Socket){
+    const key = args[1];
+    const list = listStore.get(key);
+    if(!list){
+        connection.write(nullBulk());
+        return;
+    }
+    const value = list.shift();
+    if(value){
+        connection.write(writeRESPBulkString(value));
+    }else{
+        connection.write(nullBulk());
+    }
+}
+export function handleLpop(args: string[], connection: net.Socket){
+    const key = args[1];
+    const count = parseInt(args[2]) || 1;
+    const list = listStore.get(key);
+    const res:string[] = []
+    if(list){
+        for (let i = 0; i < count && list.length > 0; i++) {
+            res.push(list.pop()!);
+        }
+        connection.write(respArray(res));
+    }
 }
