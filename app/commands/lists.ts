@@ -69,7 +69,5 @@ export async function handleBLPop(args: string[], connection: net.Socket) {
   const value = list.shift();
   if (value) {
     connection.write(respArray([key, value]));
-  } else {
-    connection.write(nullBulk());
   }
 }
