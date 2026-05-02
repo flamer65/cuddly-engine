@@ -40,7 +40,7 @@ export function handleLlen(args: string[], connection: net.Socket){
     connection.write(integer(list.length));
 }
 
-export function handleRpop(args: string[], connection: net.Socket){
+export function handleLpop(args: string[], connection: net.Socket){
     const key = args[1];
     const list = listStore.get(key);
     if(!list){
@@ -54,7 +54,7 @@ export function handleRpop(args: string[], connection: net.Socket){
         connection.write(nullBulk());
     }
 }
-export function handleLpop(args: string[], connection: net.Socket){
+export function handleRpop(args: string[], connection: net.Socket){
     const key = args[1];
     const count = parseInt(args[2]) || 1;
     const list = listStore.get(key);
