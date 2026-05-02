@@ -42,27 +42,20 @@ export function handleLlen(args: string[], connection: net.Socket){
 
 export function handleLpop(args: string[], connection: net.Socket){
     const key = args[1];
-    const list = listStore.get(key);
-    if(!list){
-        connection.write(nullBulk());
-        return;
-    }
-    const value = list.shift();
-    if(value){
+    const count = parseInt(args[2]) || 1;
+    const list = listStore.get(key) || [];
+    const res:string[] = []
+    if(count > 1 && count > list.length){
+        for (let i = 0; i < count && list.length > 0; i++) {
+            res.push(list.shift()!);
+        }
+        connection.write(respArray(res));
+    }else{
+       const value = list.shift();
+       if(value){
         connection.write(writeRESPBulkString(value));
     }else{
         connection.write(nullBulk());
     }
-}
-export function handleRpop(args: string[], connection: net.Socket){
-    const key = args[1];
-    const count = parseInt(args[2]) || 1;
-    const list = listStore.get(key);
-    const res:string[] = []
-    if(list){
-        for (let i = 0; i < count && list.length > 0; i++) {
-            res.push(list.pop()!);
-        }
-        connection.write(respArray(res));
     }
 }
