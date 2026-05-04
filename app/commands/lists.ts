@@ -1,23 +1,24 @@
 import { listStore, blpopWaiters } from "../store";
 import { integer, nullBulk, respArray, writeRESPBulkString } from "../resp";
 import * as net from "net";
-
+import { waitForDebugger } from "inspector";
+type waiter = (value: string) => void;
 export function handleRpush(args: string[], connection: net.Socket) {
   const key = args[1];
   if (!listStore.has(key)) listStore.set(key, []);
   const list = listStore.get(key)!;
   for (let i = 2; i < args.length; i++) {
     list.push(args[i]);
+
+    // Notify any BLPOP waiters for this key immediately per element
+    const waiters = blpopWaiters.get(key);
+    if (waiters && waiters.length > 0) {
+      const workerResolve = waiters.shift()!;
+      const value = list.shift()!;
+      workerResolve(value);
+    }
   }
   connection.write(integer(list.length));
-
-//   Notify any BLPOP waiters for this key
-  const waiters = blpopWaiters.get(key);
-  while (waiters && waiters.length > 0 && list.length > 0) {
-    const resolve = waiters.shift()!;
-    const value = list.shift()!;
-    resolve(value);
-  }
 }
 
 export function handleLpush(args: string[], connection: net.Socket) {
@@ -67,47 +68,52 @@ export function handleLpop(args: string[], connection: net.Socket) {
     }
   }
 }
-export function handleBLPop(args: string[], connection: net.Socket) {
+
+export async function handleBLPop(
+  args: string[],
+  connection: net.Socket,
+): Promise<string | null> {
   const key = args[1];
   const timeout = parseFloat(args[2]);
-
-  // If the list already has data, pop immediately
-  const list = listStore.get(key);
-  if (list && list.length > 0) {
+  if (!blpopWaiters.has(key)) blpopWaiters.set(key, []);
+  const list = listStore.get(key) || [];
+  if (list.length > 0) {
     const value = list.shift()!;
     connection.write(respArray([key, value]));
-    return;
+    return value;
   }
-
-  // Otherwise, register a waiter that will be resolved when RPUSH adds data
-  if (!blpopWaiters.has(key)) blpopWaiters.set(key, []);
-
   let resolved = false;
-  const waiterPromise = new Promise<string>((resolve) => {
-    blpopWaiters.get(key)!.push((value: string) => {
+  return new Promise<string>((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const workerPromise: waiter = (value: string) => {
+      if (resolved) return;
       resolved = true;
+      if (timer) clearTimeout(timer);
+      connection.write(respArray([key, value]));
       resolve(value);
-    });
-
+    };
+    blpopWaiters.get(key)!.push(workerPromise as any);
     // If timeout > 0, set a timer to give up
     if (timeout > 0) {
-      setTimeout(() => {
-        if (!resolved) {
-          // Remove this waiter from the queue
-          const waiters = blpopWaiters.get(key);
-          if (waiters) {
-            const idx = waiters.indexOf(resolve as any);
-            if (idx !== -1) waiters.splice(idx, 1);
+      timer = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+          const waiter = blpopWaiters.get(key);
+          if (waiter) {
+            const idx = waiter.indexOf(workerPromise as any);
+            if (idx !== -1) {
+              waiter.splice(idx, 1);
+            }
           }
-          connection.write("*-1\r\n");
-        }
+          connection.write(nullBulk());
       }, timeout * 1000);
     }
   });
-
-  waiterPromise.then((value) => {
-    if (resolved) {
-      connection.write(respArray([key, value]));
-    }
-  });
 }
+
+// function handleGet(args: string[], connection: net.Socket){
+//   const key = args[1];
+//   for(let key in listStore){
+
+//   }
+// }
